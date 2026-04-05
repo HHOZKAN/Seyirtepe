@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { kullaniciGuncelle } from './actions'
+import { kullaniciGuncelle, kullaniciSifreGuncelle } from './actions'
 import type { KullaniciRolu } from '@/lib/types'
 
 const ROLLER: { value: KullaniciRolu; label: string }[] = [
@@ -27,6 +28,12 @@ export function KullaniciEditForm({
   const [yukleniyor, setYukleniyor] = useState(false)
   const [hata, setHata] = useState('')
 
+  const [sifre, setSifre] = useState('')
+  const [sifreGoster, setSifreGoster] = useState(false)
+  const [sifreYukleniyor, setSifreYukleniyor] = useState(false)
+  const [sifreHata, setSifreHata] = useState('')
+  const [sifreBasari, setSifreBasari] = useState(false)
+
   async function kaydet() {
     setYukleniyor(true)
     setHata('')
@@ -39,6 +46,25 @@ export function KullaniciEditForm({
     }
   }
 
+  async function sifreKaydet() {
+    if (sifre.length < 6) {
+      setSifreHata('Şifre en az 6 karakter olmalıdır.')
+      return
+    }
+    setSifreYukleniyor(true)
+    setSifreHata('')
+    setSifreBasari(false)
+    try {
+      await kullaniciSifreGuncelle(kullanici.id, sifre)
+      setSifre('')
+      setSifreBasari(true)
+    } catch (e: any) {
+      setSifreHata(e.message ?? 'Bir hata oluştu.')
+    } finally {
+      setSifreYukleniyor(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -46,6 +72,7 @@ export function KullaniciEditForm({
         <p className="text-xs text-gray-400">{kullanici.email}</p>
       </div>
 
+      {/* Rol & Arazi */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
         <select
@@ -83,6 +110,40 @@ export function KullaniciEditForm({
         </Button>
         <Button className="flex-1" onClick={kaydet} disabled={yukleniyor}>
           {yukleniyor ? 'Kaydediliyor...' : 'Kaydet'}
+        </Button>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-gray-100 pt-4">
+        <p className="text-sm font-medium text-gray-700 mb-3">Şifre Belirle</p>
+
+        <div className="relative">
+          <input
+            type={sifreGoster ? 'text' : 'password'}
+            value={sifre}
+            onChange={e => { setSifre(e.target.value); setSifreBasari(false) }}
+            placeholder="Yeni şifre (min. 6 karakter)"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button
+            type="button"
+            onClick={() => setSifreGoster(v => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+          >
+            {sifreGoster ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {sifreHata && <p className="text-sm text-red-600 mt-1">{sifreHata}</p>}
+        {sifreBasari && <p className="text-sm text-emerald-600 mt-1">✓ Şifre güncellendi.</p>}
+
+        <Button
+          variant="outline"
+          className="w-full mt-2"
+          onClick={sifreKaydet}
+          disabled={sifreYukleniyor || !sifre}
+        >
+          {sifreYukleniyor ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
         </Button>
       </div>
     </div>

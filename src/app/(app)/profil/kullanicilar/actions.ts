@@ -15,6 +15,17 @@ async function checkAdmin() {
   return supabase
 }
 
+export async function kullaniciSifreGuncelle(kullaniciId: string, yeniSifre: string) {
+  await checkAdmin()
+  const admin = createAdminClient()
+
+  const { error } = await admin.auth.admin.updateUserById(kullaniciId, {
+    password: yeniSifre,
+  })
+
+  if (error) throw new Error(error.message)
+}
+
 export async function kullaniciGuncelle(
   kullaniciId: string,
   rol: KullaniciRolu,
