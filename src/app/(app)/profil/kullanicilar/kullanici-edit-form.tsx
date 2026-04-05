@@ -47,8 +47,8 @@ export function KullaniciEditForm({
   }
 
   async function sifreKaydet() {
-    if (sifre.length < 6) {
-      setSifreHata('Şifre en az 6 karakter olmalıdır.')
+    if (sifre.length < 8) {
+      setSifreHata('Şifre en az 8 karakter olmalıdır.')
       return
     }
     setSifreYukleniyor(true)
