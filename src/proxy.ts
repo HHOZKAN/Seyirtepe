@@ -26,10 +26,19 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  if (!user && !request.nextUrl.pathname.startsWith('/giris')) {
+  // Utilisateur non connecté → /giris
+  if (!user && !pathname.startsWith('/giris')) {
     const url = request.nextUrl.clone()
     url.pathname = '/giris'
+    return NextResponse.redirect(url)
+  }
+
+  // Utilisateur déjà connecté → redirige depuis /giris vers l'accueil
+  if (user && pathname.startsWith('/giris')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
@@ -38,6 +47,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logo\\.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)',
   ],
 }

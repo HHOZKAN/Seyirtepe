@@ -2,15 +2,16 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/types'
+import { assertInput, sanitize, validDate, validUUID } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import type { Profil } from '@/lib/types'
 
 async function checkAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Yetkisiz')
+  if (!user) throw new Error('Yetkisiz erişim.')
   const { data: profil } = await supabase.from('profiller').select('rol').eq('id', user.id).single()
-  if (!profil || !isAdmin((profil as Profil).rol)) throw new Error('Yetkisiz')
+  if (!profil || !isAdmin((profil as Profil).rol)) throw new Error('Yetkisiz erişim.')
   return supabase
 }
 
@@ -21,13 +22,19 @@ export async function faturaArazilerGuncelle(
 ) {
   const supabase = await checkAdmin()
 
+  assertInput(validUUID(faturaId), 'Geçersiz fatura.')
+  assertInput(Array.isArray(yeniAraziIdler), 'Geçersiz arazi listesi.')
+  assertInput(yeniAraziIdler.length > 0, 'En az bir arazi seçilmelidir.')
+  assertInput(yeniAraziIdler.every(validUUID), 'Geçersiz arazi ID.')
+  assertInput(faturaToplamTutar > 0, 'Geçersiz tutar.')
+
   // Mevcut fatura_araziler kayıtları
   const { data: mevcutlar } = await supabase
     .from('fatura_araziler')
     .select('id, arazi_id, odeme_durumu')
     .eq('fatura_id', faturaId)
 
-  const mevcutIdler = (mevcutlar ?? []).map((m: any) => m.arazi_id)
+  const mevcutIdler = (mevcutlar ?? []).map((m: any) => m.arazi_id as string)
 
   // Eklenecekler
   const eklenecekler = yeniAraziIdler.filter((id) => !mevcutIdler.includes(id))
@@ -38,12 +45,8 @@ export async function faturaArazilerGuncelle(
   )
 
   // Yeni tutar payı
-  const payTutar =
-    yeniAraziIdler.length > 0
-      ? Math.round((faturaToplamTutar / yeniAraziIdler.length) * 100) / 100
-      : 0
+  const payTutar = Math.round((faturaToplamTutar / yeniAraziIdler.length) * 100) / 100
 
-  // Sil
   if (silinecekler.length > 0) {
     await supabase
       .from('fatura_araziler')
@@ -51,7 +54,6 @@ export async function faturaArazilerGuncelle(
       .in('id', silinecekler.map((m: any) => m.id))
   }
 
-  // Ekle
   if (eklenecekler.length > 0) {
     await supabase.from('fatura_araziler').insert(
       eklenecekler.map((arazi_id) => ({
@@ -89,12 +91,24 @@ export async function faturaGuncelle(
 ) {
   const supabase = await checkAdmin()
 
+  assertInput(validUUID(faturaId), 'Geçersiz fatura.')
+  assertInput(sanitize(data.baslik).length >= 1, 'Başlık boş olamaz.')
+  assertInput(data.tutar > 0, 'Tutar sıfırdan büyük olmalıdır.')
+  assertInput(validDate(data.vade_tarihi), 'Geçersiz vade tarihi.')
+  assertInput(!data.gider_tipi_id || validUUID(data.gider_tipi_id), 'Geçersiz gider tipi.')
+
   const { error } = await supabase
     .from('faturalar')
-    .update(data)
+    .update({
+      baslik: sanitize(data.baslik, 255),
+      aciklama: data.aciklama ? sanitize(data.aciklama, 1000) : null,
+      tutar: data.tutar,
+      vade_tarihi: data.vade_tarihi,
+      gider_tipi_id: data.gider_tipi_id || null,
+    })
     .eq('id', faturaId)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error('Fatura güncellenirken bir hata oluştu.')
 
   revalidatePath(`/faturalar/${faturaId}`)
   revalidatePath('/faturalar')
