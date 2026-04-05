@@ -14,6 +14,69 @@ async function checkAdmin() {
   return supabase
 }
 
+export async function faturaArazilerGuncelle(
+  faturaId: string,
+  faturaToplamTutar: number,
+  yeniAraziIdler: string[]
+) {
+  const supabase = await checkAdmin()
+
+  // Mevcut fatura_araziler kayıtları
+  const { data: mevcutlar } = await supabase
+    .from('fatura_araziler')
+    .select('id, arazi_id, odeme_durumu')
+    .eq('fatura_id', faturaId)
+
+  const mevcutIdler = (mevcutlar ?? []).map((m: any) => m.arazi_id)
+
+  // Eklenecekler
+  const eklenecekler = yeniAraziIdler.filter((id) => !mevcutIdler.includes(id))
+
+  // Silinecekler — sadece ödeme beyan edilmemişler
+  const silinecekler = (mevcutlar ?? []).filter(
+    (m: any) => !yeniAraziIdler.includes(m.arazi_id) && !m.odeme_durumu
+  )
+
+  // Yeni tutar payı
+  const payTutar =
+    yeniAraziIdler.length > 0
+      ? Math.round((faturaToplamTutar / yeniAraziIdler.length) * 100) / 100
+      : 0
+
+  // Sil
+  if (silinecekler.length > 0) {
+    await supabase
+      .from('fatura_araziler')
+      .delete()
+      .in('id', silinecekler.map((m: any) => m.id))
+  }
+
+  // Ekle
+  if (eklenecekler.length > 0) {
+    await supabase.from('fatura_araziler').insert(
+      eklenecekler.map((arazi_id) => ({
+        fatura_id: faturaId,
+        arazi_id,
+        tutar: payTutar,
+      }))
+    )
+  }
+
+  // Kalan kayıtların tutarını güncelle
+  const kalanIdler = (mevcutlar ?? [])
+    .filter((m: any) => yeniAraziIdler.includes(m.arazi_id))
+    .map((m: any) => m.id)
+
+  if (kalanIdler.length > 0) {
+    await supabase
+      .from('fatura_araziler')
+      .update({ tutar: payTutar })
+      .in('id', kalanIdler)
+  }
+
+  revalidatePath(`/faturalar/${faturaId}`)
+}
+
 export async function faturaGuncelle(
   faturaId: string,
   data: {

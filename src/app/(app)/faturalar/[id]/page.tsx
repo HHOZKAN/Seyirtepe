@@ -6,6 +6,7 @@ import { FaturaBadge, OdemeBadge, OdenmediBadge } from '@/components/shared/stat
 import { FaturaDurumActions } from './fatura-durum-actions'
 import { OdemeBeyanSheet } from './odeme-beyan-sheet'
 import { FaturaEditSheet } from './fatura-edit-sheet'
+import { FaturaArazilerSheet } from './fatura-araziler-sheet'
 import type { Profil, GiderTipi } from '@/lib/types'
 
 export default async function FaturaDetayPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,9 +18,10 @@ export default async function FaturaDetayPage({ params }: { params: Promise<{ id
   const yonetici = isYonetici((profil as Profil).rol)
   const admin = isAdmin((profil as Profil).rol)
 
-  const [{ data: fatura }, { data: giderTipleri }] = await Promise.all([
+  const [{ data: fatura }, { data: giderTipleri }, { data: tumAraziler }] = await Promise.all([
     supabase.from('faturalar').select('*, gider_tipleri(ad)').eq('id', id).single(),
     supabase.from('gider_tipleri').select('*').eq('aktif', true).order('ad'),
+    supabase.from('araziler').select('id, numara').order('numara'),
   ])
 
   if (!fatura) notFound()
@@ -92,9 +94,22 @@ export default async function FaturaDetayPage({ params }: { params: Promise<{ id
         )}
 
         <div>
-          <h3 className="font-semibold text-gray-900 mb-3">
-            {yonetici ? 'Arazi Ödemeleri' : 'Ödeme Durumum'}
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900">
+              {yonetici ? 'Arazi Ödemeleri' : 'Ödeme Durumum'}
+            </h3>
+            {admin && (
+              <FaturaArazilerSheet
+                faturaId={id}
+                faturaToplamTutar={fatura.tutar}
+                tumAraziler={tumAraziler ?? []}
+                mevcutFaturaAraziler={(faturaAraziler ?? []).map((fa: any) => ({
+                  arazi_id: fa.arazi_id,
+                  odeme_durumu: fa.odeme_durumu,
+                }))}
+              />
+            )}
+          </div>
           <div className="space-y-2">
             {(faturaAraziler ?? []).map((fa: any) => (
               <div key={fa.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
