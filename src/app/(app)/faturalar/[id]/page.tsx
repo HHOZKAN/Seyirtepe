@@ -5,7 +5,8 @@ import { PageHeader } from '@/components/shared/page-header'
 import { FaturaBadge, OdemeBadge, OdenmediBadge } from '@/components/shared/status-badge'
 import { FaturaDurumActions } from './fatura-durum-actions'
 import { OdemeBeyanSheet } from './odeme-beyan-sheet'
-import type { Profil } from '@/lib/types'
+import { FaturaEditSheet } from './fatura-edit-sheet'
+import type { Profil, GiderTipi } from '@/lib/types'
 
 export default async function FaturaDetayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,11 +17,10 @@ export default async function FaturaDetayPage({ params }: { params: Promise<{ id
   const yonetici = isYonetici((profil as Profil).rol)
   const admin = isAdmin((profil as Profil).rol)
 
-  const { data: fatura } = await supabase
-    .from('faturalar')
-    .select('*, gider_tipleri(ad)')
-    .eq('id', id)
-    .single()
+  const [{ data: fatura }, { data: giderTipleri }] = await Promise.all([
+    supabase.from('faturalar').select('*, gider_tipleri(ad)').eq('id', id).single(),
+    supabase.from('gider_tipleri').select('*').eq('aktif', true).order('ad'),
+  ])
 
   if (!fatura) notFound()
 
@@ -52,6 +52,19 @@ export default async function FaturaDetayPage({ params }: { params: Promise<{ id
             </div>
             <FaturaBadge durum={fatura.durum} />
           </div>
+          {admin && (
+            <FaturaEditSheet
+              faturaId={id}
+              baslangic={{
+                baslik: fatura.baslik,
+                aciklama: fatura.aciklama,
+                tutar: fatura.tutar,
+                vade_tarihi: fatura.vade_tarihi,
+                gider_tipi_id: fatura.gider_tipi_id,
+              }}
+              giderTipleri={(giderTipleri ?? []) as GiderTipi[]}
+            />
+          )}
           {fatura.gider_tipleri && (
             <p className="text-sm text-gray-500">{(fatura.gider_tipleri as any).ad}</p>
           )}
